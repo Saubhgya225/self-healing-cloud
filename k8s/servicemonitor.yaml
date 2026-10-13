@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: self-healing-servicemonitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: self-healing-app
+spec:
+  namespaceSelector:
+    matchNames:
+      - self-healing-cloud
+  selector:
+    matchLabels:
+      app: self-healing-app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 10s
+      scrapeTimeout: 5s

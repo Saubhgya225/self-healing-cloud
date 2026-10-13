@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: self-healing-sa
+  namespace: self-healing-cloud
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: self-healing-role
+  namespace: self-healing-cloud
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/status", "pods/log", "events", "services"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale", "replicasets"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: self-healing-rolebinding
+  namespace: self-healing-cloud
+subjects:
+  - kind: ServiceAccount
+    name: self-healing-sa
+    namespace: self-healing-cloud
+roleRef:
+  kind: Role
+  name: self-healing-role
+  apiGroup: rbac.authorization.k8s.io

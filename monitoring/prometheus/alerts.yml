@@ -1,0 +1,47 @@
+groups:
+  - name: self-healing-alerts
+    rules:
+      - alert: PodLivenessProbeFailing
+        expr: self_healing_pod_liveness_status == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod liveness probe is failing"
+          description: "Pod {{ $labels.pod_name }} reported failing liveness. Kubelet container restart anticipated."
+
+      - alert: PodReadinessProbeFailing
+        expr: self_healing_pod_readiness_status == 0
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod readiness probe is failing"
+          description: "Pod {{ $labels.pod_name }} is marked unready and has been isolated from service routing."
+
+      - alert: HighHttpErrorRate
+        expr: (sum(rate(http_requests_total{http_status=~"5.."}[2m])) / sum(rate(http_requests_total[2m]))) * 100 > 10
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx Error Rate"
+          description: "Error rate is above 10% for the past 2 minutes."
+
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[2m])) by (le)) > 2.0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P95 Latency Detected"
+          description: "P95 response latency exceeded 2.0 seconds."
+
+      - alert: HighCpuUtilization
+        expr: sum(rate(container_cpu_usage_seconds_total{namespace="self-healing-cloud"}[2m])) > 0.8
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "Application High CPU Load"
+          description: "Horizontal Pod Autoscaler scale-out trigger active."

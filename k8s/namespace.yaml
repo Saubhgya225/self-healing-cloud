@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: self-healing-cloud
+  labels:
+    name: self-healing-cloud
+    environment: production
+    project: self-healing-cloud-platform

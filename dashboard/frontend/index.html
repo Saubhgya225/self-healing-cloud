@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Healing Cloud Infrastructure Platform</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .pulse-healthy { animation: pulseGreen 2s infinite; }
+        @keyframes pulseGreen {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-cloud-bolt text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        Self-Healing Cloud
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">v1.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Kubernetes Automated Recovery & Autoscaling Platform</p>
+                </div>
+            </div>
+            
+            <!-- Quick Links -->
+            <div class="flex items-center space-x-3">
+                <a href="/metrics" target="_blank" class="px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-chart-line text-amber-400"></i> Metrics Endpoint
+                </a>
+                <a href="http://localhost:3000" target="_blank" class="px-3 py-1.5 rounded-md text-xs font-medium bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 transition flex items-center gap-1.5 border border-orange-500/30">
+                    <i class="fa-solid fa-fire text-orange-400"></i> Grafana (:3000)
+                </a>
+                <a href="http://localhost:9090" target="_blank" class="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600/20 hover:bg-red-600/30 text-red-400 transition flex items-center gap-1.5 border border-red-500/30">
+                    <i class="fa-solid fa-server text-red-400"></i> Prometheus (:9090)
+                </a>
+                <button onclick="refreshData()" class="p-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs transition">
+                    <i class="fa-solid fa-rotate" id="refresh-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        <!-- Banner Alert for Injected Faults -->
+        <div id="chaos-banner" class="hidden rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-300 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-triangle-exclamation text-rose-400 text-xl"></i>
+                <div>
+                    <span class="font-semibold text-sm">Active Fault Injected:</span>
+                    <span id="chaos-banner-text" class="text-sm ml-2">Testing failure scenario</span>
+                </div>
+            </div>
+            <button onclick="resetChaos()" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-medium">
+                Reset to Healthy
+            </button>
+        </div>
+
+        <!-- Top Metrics KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
+                <div class="flex justify-between items-center text-slate-400 text-xs font-medium">
+                    <span>HEALTHY PODS</span>
+                    <i class="fa-solid fa-cubes text-emerald-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline space-x-2">
+                    <span id="stat-healthy-pods" class="text-2xl font-bold text-white">--</span>
+                    <span id="stat-total-pods" class="text-xs text-slate-400">/ -- desired</span>
+                </div>
+                <div class="mt-1 text-xs text-emerald-400 flex items-center gap-1">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400 pulse-healthy"></span>
+                    <span id="stat-cluster-status">Reconciled</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
+                <div class="flex justify-between items-center text-slate-400 text-xs font-medium">
+                    <span>HPA AUTOSCALING</span>
+                    <i class="fa-solid fa-arrows-left-right-to-line text-indigo-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline space-x-2">
+                    <span id="stat-hpa-replicas" class="text-2xl font-bold text-white">--</span>
+                    <span class="text-xs text-slate-400" id="stat-hpa-limits">Min 2 / Max 5</span>
+                </div>
+                <div class="mt-1 text-xs text-indigo-400 flex items-center gap-1">
+                    <span id="stat-hpa-cpu">Target: 60% CPU</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
+                <div class="flex justify-between items-center text-slate-400 text-xs font-medium">
+                    <span>REQUEST THROUGHPUT</span>
+                    <i class="fa-solid fa-gauge-high text-cyan-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline space-x-2">
+                    <span id="stat-rps" class="text-2xl font-bold text-white">0.0</span>
+                    <span class="text-xs text-slate-400">req/sec</span>
+                </div>
+                <div class="mt-1 text-xs text-cyan-400">
+                    Live Prometheus Rate
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
+                <div class="flex justify-between items-center text-slate-400 text-xs font-medium">
+                    <span>P95 LATENCY</span>
+                    <i class="fa-solid fa-stopwatch text-amber-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline space-x-2">
+                    <span id="stat-latency" class="text-2xl font-bold text-white">0.0</span>
+                    <span class="text-xs text-slate-400">ms</span>
+                </div>
+                <div class="mt-1 text-xs text-amber-400">
+                    Histogram Quantile (p95)
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
+                <div class="flex justify-between items-center text-slate-400 text-xs font-medium">
+                    <span>ERROR RATE</span>
+                    <i class="fa-solid fa-shield-virus text-rose-400"></i>
+                </div>
+                <div class="mt-2 flex items-baseline space-x-2">
+                    <span id="stat-error-rate" class="text-2xl font-bold text-white">0.0</span>
+                    <span class="text-xs text-slate-400">%</span>
+                </div>
+                <div class="mt-1 text-xs text-slate-400">
+                    HTTP 5xx / Total
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Pod Fleet & Autoscaling Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Pod Fleet Cards (2 Cols) -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-network-wired text-indigo-400"></i>
+                            Live Kubernetes Pod Fleet
+                        </h2>
+                        <p class="text-xs text-slate-400">Instances running in namespace <code class="text-indigo-300">self-healing-cloud</code></p>
+                    </div>
+                    <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700" id="pod-fleet-count">
+                        0 Pods
+                    </span>
+                </div>
+
+                <div id="pod-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Dynamic Pod Cards inserted by app.js -->
+                    <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 animate-pulse text-xs text-slate-400">
+                        Connecting to cluster controller...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Autoscaler (HPA) Status Card (1 Col) -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-emerald-400"></i>
+                        Autoscaling Status (HPA)
+                    </h2>
+                    <p class="text-xs text-slate-400">Kubernetes Horizontal Pod Autoscaler metrics</p>
+
+                    <div class="mt-4 space-y-3">
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-300 mb-1">
+                                <span>CPU Utilization</span>
+                                <span id="hpa-cpu-text">0% / 60%</span>
+                            </div>
+                            <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                                <div id="hpa-cpu-bar" class="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-lg bg-slate-800/60 border border-slate-700/50 text-xs space-y-1.5">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Current Replicas:</span>
+                                <span id="hpa-curr-rep" class="font-semibold text-white">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Desired Replicas:</span>
+                                <span id="hpa-des-rep" class="font-semibold text-white">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Scale Boundaries:</span>
+                                <span id="hpa-bounds" class="text-slate-300">Min 2 &bull; Max 5</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Metrics Source:</span>
+                                <span class="text-emerald-400 font-medium">Metrics Server (API)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-800 flex gap-2">
+                    <button onclick="triggerWorkload('cpu', 10, 90)" class="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-fire"></i> Stress CPU (10s)
+                    </button>
+                    <button onclick="triggerWorkload('delay', 1)" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-clock"></i> Test Latency
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Chaos Engineering Console -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-biohazard text-rose-400"></i>
+                        Controlled Chaos & Failure Injection Console
+                    </h2>
+                    <p class="text-xs text-slate-400">Safely simulate cloud infrastructure incidents and verify Kubernetes automated reconciliation</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="resetChaos()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-heart-pulse"></i> Clear All Faults
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Fault 1: Liveness Failure -->
+                <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition space-y-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="h-8 w-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                            <i class="fa-solid fa-heart-crack"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-white">Fail Liveness Probe</h3>
+                            <span class="text-[10px] text-slate-400">Kubelet Container Restart</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Forces <code>/health/live</code> to return HTTP 500. Kubelet detects failure and restarts the unhealthy container.</p>
+                    <button onclick="triggerFault('liveness', 30)" class="w-full py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-medium transition">
+                        Inject Liveness Failure
+                    </button>
+                </div>
+
+                <!-- Fault 2: Readiness Failure -->
+                <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition space-y-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                            <i class="fa-solid fa-ban"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-white">Fail Readiness Probe</h3>
+                            <span class="text-[10px] text-slate-400">Traffic Exclusion</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Forces <code>/health/ready</code> to return HTTP 503. Service excludes the instance from traffic routing.</p>
+                    <button onclick="triggerFault('readiness', 30)" class="w-full py-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium transition">
+                        Inject Readiness Failure
+                    </button>
+                </div>
+
+                <!-- Fault 3: Crash Process -->
+                <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition space-y-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="h-8 w-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                            <i class="fa-solid fa-skull"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-white">Crash Container Process</h3>
+                            <span class="text-[10px] text-slate-400">SIGKILL Simulation</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Forces container process exit (os._exit 1). Kubernetes immediately restarts container with CrashLoopBackOff tracking.</p>
+                    <button onclick="triggerFault('crash')" class="w-full py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition">
+                        Crash Process
+                    </button>
+                </div>
+
+                <!-- Fault 4: Automated MTTR Benchmark -->
+                <div class="p-4 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition space-y-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="h-8 w-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                            <i class="fa-solid fa-stopwatch-20"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-semibold text-white">MTTR Benchmark Test</h3>
+                            <span class="text-[10px] text-slate-400">Measure Recovery Time</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Deletes a live pod, polls until replacement reaches <code>Ready</code> state, and records exact MTTR in database.</p>
+                    <button onclick="runMttrBenchmark()" class="w-full py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-medium transition">
+                        Run MTTR Benchmark
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Live Traffic Chart & Experiments Table -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Chart Container (1 Col) -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-area text-cyan-400"></i>
+                        Traffic & Latency
+                    </h2>
+                    <span class="text-xs text-slate-400">Live Window</span>
+                </div>
+                <div class="h-64">
+                    <canvas id="trafficChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Experiment History Table (2 Cols) -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-clipboard-check text-emerald-400"></i>
+                                Experiment History & Self-Healing Benchmarks
+                            </h2>
+                            <p class="text-xs text-slate-400">Recorded infrastructure experiments and Mean Time To Recovery (MTTR)</p>
+                        </div>
+                        <a href="/results/experiments.csv" download class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 flex items-center gap-1">
+                            <i class="fa-solid fa-download"></i> CSV
+                        </a>
+                    </div>
+
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="text-[11px] uppercase bg-slate-800/60 text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="py-2.5 px-3">Experiment ID</th>
+                                    <th class="py-2.5 px-3">Scenario</th>
+                                    <th class="py-2.5 px-3">Initial &rarr; Final</th>
+                                    <th class="py-2.5 px-3">Recovery Time</th>
+                                    <th class="py-2.5 px-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="experiments-table-body" class="divide-y divide-slate-800/60 font-mono text-slate-300">
+                                <tr>
+                                    <td colspan="5" class="py-4 text-center text-slate-500 font-sans">No experiments recorded yet. Click "Run MTTR Benchmark" above.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Footer System Information Bar -->
+                <div class="pt-3 border-t border-slate-800 text-[11px] text-slate-500 flex flex-wrap justify-between gap-2">
+                    <span>Host Node: <span id="footer-node" class="text-slate-400">minikube</span></span>
+                    <span>Container: <span id="footer-pod" class="text-slate-400">--</span></span>
+                    <span>Memory: <span id="footer-mem" class="text-slate-400">-- MB</span></span>
+                    <span>K8s Status: <span id="footer-k8s" class="text-emerald-400">Connected</span></span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- JavaScript Client -->
+    <script src="/dashboard/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+prometheus-client
+pydantic
+httpx
+pytest
+pytest-cov
+locust
+pandas
+matplotlib
+numpy
+kubernetes
